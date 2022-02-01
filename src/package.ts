@@ -1,21 +1,20 @@
 import { RequestHandler } from 'express';
 import { ls } from 'npm-remote-ls';
 import { treeify } from 'json-toy';
+import got from "got";
 
-const als = (name, version) => {
-  return new Promise((resolve, reject) => {
-    ls(name, version, false, (data, err) => {
-      if (err) {
-        reject({
-          error: true,
-          message: err,
-        });
-      } else {
+import { NPMPackage } from './types';
+
+const als = (name, version) =>
+  new Promise((resolve, reject) => {
+    try {
+      ls(name, version, false, (data) => {
         resolve(data[`${name}@${version}`]);
-      }
-    });
+      })
+    } catch (e) {
+      reject(e);
+    }
   });
-}
 
 /**
  * Attempts to retrieve package data from the npm registry and return it
@@ -24,6 +23,11 @@ export const getPackage: RequestHandler = async function (req, res, next) {
   const { name, version, html } = req.params;
 
   try {
+    // reinstate exact registry fetch as als doesn't actually throw
+    const npmPackage: NPMPackage = await got(
+        `https://registry.npmjs.org/${name}/${version}`,
+    ).json();
+
     const dependencies = await als(name, version);
     const body = {
       name,
@@ -40,7 +44,7 @@ export const getPackage: RequestHandler = async function (req, res, next) {
       });
     }
   } catch (error) {
-    return next(error);
+    next(error);
   }
 };
 
